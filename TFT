@@ -1,0 +1,86 @@
+import pandas as pd
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_forecasting import TemporalFusionTransformer
+from pytorch_forecasting.metrics import MAE
+from pytorch_lightning.core.module import LightningModule
+
+
+file_path = "G:\\haodf\\pannel\\experiment_list_1.xlsx"
+data = pd.read_excel(file_path)
+
+earliest_time = min(df['time'])
+# 3. 计算 months_from_start
+df['months_from_start'] = df['time'].apply(lambda x: (x.year - earliest_time.year) * 12 + (x.month - earliest_time.month))
+print(df.shape)
+
+from pytorch_forecasting import TimeSeriesDataSet
+max_prediction_length = 1
+max_encoder_length = 12
+# validation_length = 6  # 验证集包含最后 6 个时间步的数据
+training_cutoff = df["months_from_start"].max() - max_encoder_length  # 23-6 = 17
+
+training = TimeSeriesDataSet(
+    df[lambda x: x.months_from_start <= training_cutoff],
+    time_idx="months_from_start",
+    target="city_ratio",
+    group_ids=["doc_id"],
+    min_encoder_length=max_encoder_length // 2, 
+    max_encoder_length=max_encoder_length,
+    min_prediction_length=1,
+    max_prediction_length=max_prediction_length,
+    static_categoricals=["pro_index","hostitle","title"],
+    static_reals=["complexRank", "hitCnt"], 
+    time_varying_known_reals=["honor","months_from_start","gift_account_aver","consult","doctorMsgNum","msgCount","vote","variable2"],
+    time_varying_unknown_reals=['city_ratio'],
+    target_normalizer=None,
+    add_relative_time_idx=True,
+    add_target_scales=True,
+    add_encoder_length=True,
+)
+
+
+validation = TimeSeriesDataSet.from_dataset(training, df, predict=True, stop_randomization=True)
+
+# create dataloaders for  our model
+batch_size = 64 
+# if you have a strong GPU, feel free to increase the number of workers  
+train_dataloader = training.to_dataloader(train=True, batch_size=batch_size, num_workers=0)
+val_dataloader = validation.to_dataloader(train=False, batch_size=batch_size * 10, num_workers=0)
+
+
+early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=1e-4, patience=15, verbose=True, mode="min")
+lr_logger = LearningRateMonitor()  
+logger = TensorBoardLogger("lightning_logs")  
+
+trainer = pl.Trainer(
+    max_epochs=45,
+    accelerator='cpu', 
+    devices=1,
+    enable_model_summary=True,
+    gradient_clip_val=0.1,
+    callbacks=[lr_logger, early_stop_callback],
+    logger=logger)
+
+tft = TemporalFusionTransformer.from_dataset(
+    training,
+    learning_rate=0.001,
+    hidden_size=160,
+    attention_head_size=4,
+    dropout=0.1,
+    hidden_continuous_size=160,
+    output_size=1,  # there are 7 quantiles by default: [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98]
+    loss=MAE(),
+    log_interval=10, 
+    reduce_on_plateau_patience=4)
+print(isinstance(tft, LightningModule))  # 应该返回 True
+trainer.fit(
+    tft,
+    train_dataloaders=train_dataloader,
+    val_dataloaders=val_dataloader)
+
+
+best_model_path = trainer.checkpoint_callback.best_model_path
+print(best_model_path)
+best_tft = TemporalFusionTransformer.load_from_checkpoint(best_model_path)
