@@ -1,0 +1,92 @@
+# path = f"G:\\haodf\\doc_json\\13862\\{doc_id}\\"
+# basic = pd.read_json(path+"basic.json")
+# article = pd.read_json(path+"article.json")
+# consult = pd.read_json(path+"consult.json")
+# gift = pd.read_json(path+"gift.json")
+# online = pd.read_json(path+"online.json")
+# space = pd.read_json(path+"space.json")
+# tree = pd.read_json(path+"tree.json")
+# vote = pd.read_json(path+"vote.json")
+
+# doc_data = pd.DataFrame(["name","doc_id","sex","grade","level","hitCnt","hotRank","complexRank","hospitalFacultyName","hospitalLevel",
+#                          "doctorHonor","articleCnt","totalConsults","gift_total","patientNum",'onlineServiceSatisfaction',"waitingTime",
+#                          'hosLevelDesc',"realHospitalName","tree_level","tree_stage","experience",
+#                         ])
+# file = ["basic", "consult", "gift", "online", "space", "tree", "vote","achievement"]
+            
+import pandas as pd
+import json
+
+class Doc:
+    def __init__(self, doc_id, list_file):
+        self.doc_id = doc_id
+        self.list_file = list_file
+        self.doc_infor = {}  
+
+    def extract_info(self):
+        for item in self.list_file:
+            path = f"G:\\haodf\\doc_info\\{self.doc_id}\\{item}.json"
+            data = pd.read_json(path)
+            if item == "basic": 
+                self.doc_infor["name"] = data.get("data").get("doctorBaseInfo").get("name") # 医生姓名
+                self.doc_infor["doc_id"] = data.get("data").get("doctorBaseInfo").get("doctorId") # 医生id
+                self.doc_infor["level"] = data.get("data").get("doctorBaseInfo").get("level")
+                self.doc_infor["hospitalFacultyName"] = data.get("data").get("doctorBaseInfo").get("hospitalFacultyName")
+                self.doc_infor["complexRank"] = data.get("data").get("doctorBaseInfo").get("complexRank")
+                self.doc_infor["doctorGrade"] = data.get("data").get("doctorBaseInfo").get("doctorGrade")
+                self.doc_infor["sex"] = data.get("data").get("doctorBaseInfo").get("sex")
+                self.doc_infor["hitCnt"] = data.get("data").get("doctorBaseInfo").get("hitCnt")
+                self.doc_infor["hotRank"] = data.get("data").get("doctorBaseInfo").get("hotRank")
+                self.doc_infor["hospitalLevel"] = data.get("data").get("doctorBaseInfo").get("hospitalLevel")
+                self.doc_infor["liaoxiao_satis"] = data.get("data").get("doctorCommentInfo").get("rate1Precent")
+                self.doc_infor["atti_satis"] = data.get("data").get("doctorCommentInfo").get("rate2Precent")
+                self.doc_infor["isHavingHeadImg"] = data.get("data").get("doctorBaseInfo").get("isHavingHeadImg")
+                
+            elif item == "consult":
+                self.doc_infor["totalConsults"] = data.get("data").get("totalConsults")
+               
+            elif item == "gift":
+                self.doc_infor["gift"] = data.get("data").get("pageInfo").get("total")
+                
+            elif item == "online":
+                self.doc_infor["patientNum"] = data.get("data").get("commentQualityInfo").get("patientNum")
+                self.doc_infor["onlineServiceSatisfaction"] = data.get("data").get("commentQualityInfo").get("onlineServiceSatisfaction")
+                self.doc_infor["waitingTime"] = data.get("data").get("commentQualityInfo").get("waitingTime")
+            elif item == "space":
+                self.doc_infor["hosLevelDesc"] = data.get("data").get("docPriHfRefInfo").get("hosLevelDesc")
+                self.doc_infor["realHospitalName"] = data.get("data").get("docPriHfRefInfo").get("realHospitalName")
+            elif item == "tree":
+                self.doc_infor["tree_level"] = data.get("data").get("level")
+                self.doc_infor["experience"] = data.get("data").get("experience")
+                self.doc_infor["levelRate"] = data.get("data").get("levelRate")
+            elif item == "vote":
+                self.doc_infor["total_vote"] = data.get("data").get("siftTermList")[0].get('cnt')
+                self.doc_infor["2year_vote"] = data.get("data").get("siftTermList")[1].get('cnt')
+                self.doc_infor["negative_vote"] = data.get("data").get("siftTermList")[2].get('cnt')
+                self.doc_infor["reply_vote"] = data.get("data").get("siftTermList")[4].get('cnt')
+            elif item == "achievement":
+                self.doc_infor["totalSignInCount"] = data.get("data").get("totalSignInCount")
+                self.doc_infor["openSpaceTime"] = data.get("data").get("openSpaceTime")
+                self.doc_infor["spaceRepliedCount"] = data.get("data").get("spaceRepliedCount")
+                self.doc_infor["spaceActiveDate"] = data.get("data").get("spaceActiveDate")
+                self.doc_infor["openSpaceTime"] = data.get("data").get("openSpaceTime")
+                self.doc_infor["articleNum"] = data.get("data").get("articleNum")
+                
+    def save_info(self):
+        self.extract_info()
+        df = pd.DataFrame([self.doc_infor])
+        df.to_excel(f"G:\\haodf\\doc_excel\\{self.doc_id}.xlsx", index=False)
+
+doc_id = pd.read_excel("G:\\haodf\\temp\\non_space_doc.xlsx")["doc_id"].tolist()# 医生ID
+
+list_file = ["basic", "consult", "gift", "online", "space", "tree", "vote","achievement"]
+
+for item in data:
+    doc = Doc(item,list_file)
+    try:
+        doc.save_info()
+    except Exception as e:
+        print(item,e)
+       
+    
+    
